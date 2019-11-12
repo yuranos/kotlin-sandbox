@@ -44,11 +44,8 @@ data class UserInfo(
 fun extractUserInfo(userInfoData: String): Option<UserInfo> =
     Option.fromNullable(UserInfo.deserializeFromJson(userInfoData))
 
-fun saveUserInfo(maybeUserInfo: Option<UserInfo>): Option<UserInfo> =
-    when (maybeUserInfo) {
-        is Some -> Some(saveRecord(maybeUserInfo.t))
-        is None -> maybeUserInfo
-    }
+fun saveUserInfo(maybeUserInfo: UserInfo): UserInfo =
+    saveRecord(maybeUserInfo)
 
 fun addStarRating(maybeUserInfo: Option<UserInfo>): Option<UserInfo> =
     when (maybeUserInfo) {
@@ -66,7 +63,7 @@ fun getUserInfo(username: String): Option<UserInfo> {
     val apiData = callApi(username)
     val userInfo = extractUserInfo(apiData)
     val ratedUserInfo = addStarRating(userInfo)
-    return saveUserInfo(ratedUserInfo)
+    return ratedUserInfo.map { saveUserInfo(it) }
 }
 
 fun callApi(username: String): String {
