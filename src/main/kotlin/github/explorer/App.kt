@@ -1,5 +1,8 @@
 package github.explorer
 
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Some
 import com.beust.klaxon.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -38,29 +41,28 @@ data class UserInfo(
     }
 }
 
-fun extractUserInfo(userInfoData: String): UserInfo? =
-    UserInfo.deserializeFromJson(userInfoData)
+fun extractUserInfo(userInfoData: String): Option<UserInfo> =
+    Option.fromNullable(UserInfo.deserializeFromJson(userInfoData))
 
-fun saveUserInfo(userInfo: UserInfo?): UserInfo? {
-    if (userInfo == null) {
-        return userInfo
+fun saveUserInfo(maybeUserInfo: Option<UserInfo>): Option<UserInfo> =
+    when (maybeUserInfo) {
+        is Some -> Some(saveRecord(maybeUserInfo.t))
+        is None -> maybeUserInfo
     }
 
-    return saveRecord(userInfo)
-}
-
-fun addStarRating(userInfo: UserInfo?): UserInfo? {
-    if (userInfo == null) {
-        return userInfo
+fun addStarRating(maybeUserInfo: Option<UserInfo>): Option<UserInfo> =
+    when (maybeUserInfo) {
+        is Some -> {
+            val userInfo = maybeUserInfo.t
+            if (userInfo.publicReposCount > 20) {
+                userInfo.username = userInfo.username + " ⭐"
+            }
+            Some(userInfo)
+        }
+        is None -> maybeUserInfo
     }
 
-    if (userInfo.publicReposCount > 20) {
-        userInfo.username = userInfo.username + " ⭐"
-    }
-    return userInfo
-}
-
-fun getUserInfo(username: String): UserInfo? {
+fun getUserInfo(username: String): Option<UserInfo> {
     val apiData = callApi(username)
     val userInfo = extractUserInfo(apiData)
     val ratedUserInfo = addStarRating(userInfo)
@@ -84,7 +86,7 @@ fun run(args: Array<String>) {
     val username = args.firstOrNull()
 
     try {
-        println(getUserInfo(username ?: "dryblaze"))
+        println(getUserInfo(username ?: "adomokos"))
     } catch (ex: Exception) {
         println("Error occurred: $ex")
     }
