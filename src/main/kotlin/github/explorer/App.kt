@@ -1,8 +1,9 @@
 package github.explorer
 
-import arrow.core.None
-import arrow.core.Option
-import arrow.core.Some
+import arrow.core.Either
+import arrow.core.flatMap
+import arrow.core.left
+import arrow.core.right
 import com.beust.klaxon.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -16,6 +17,7 @@ sealed class AppError {
     data class UserNotFound(val errorInfo: String) : AppError()
     data class GitHubConnectionFailed(val errorInfo: String) : AppError()
     data class UserDataJsonParseFailed(val errorInfo: String) : AppError()
+    data class UserInfoSaveFailed(val errorInfo: String) : AppError()
 }
 
 @Target(AnnotationTarget.FIELD)
@@ -41,11 +43,17 @@ data class UserInfo(
     }
 }
 
-fun extractUserInfo(userInfoData: String): Option<UserInfo> =
-    Option.fromNullable(UserInfo.deserializeFromJson(userInfoData))
+fun extractUserInfo(userInfoData: String): Either<AppError, UserInfo> {
+    val userInfo = UserInfo.deserializeFromJson(userInfoData)
+    return userInfo?.right() ?: AppError.UserDataJsonParseFailed("userInfoData").left()
+}
 
-fun saveUserInfo(maybeUserInfo: UserInfo): UserInfo =
-    saveRecord(maybeUserInfo)
+fun saveUserInfo(userInfo: UserInfo): Either<AppError, UserInfo> =
+    if (saveRecord(userInfo)) {
+        AppError.UserInfoSaveFailed("Saving the user record failed").left()
+    } else {
+        userInfo.right()
+    }
 
 fun addStarRating(userInfo: UserInfo): UserInfo {
     if (userInfo.publicReposCount > 20) {
@@ -54,13 +62,13 @@ fun addStarRating(userInfo: UserInfo): UserInfo {
     return userInfo
 }
 
-fun getUserInfo(username: String): Option<UserInfo> =
+fun getUserInfo(username: String): Either<AppError, UserInfo> =
     callApi(username)
         .flatMap(::extractUserInfo)
         .map(::addStarRating)
-        .map(::saveUserInfo)
+        .flatMap(::saveUserInfo)
 
-fun callApi(username: String): Option<String> {
+fun callApi(username: String): Either<AppError, String> {
     val client = HttpClient.newBuilder().build()
     val request =
         HttpRequest
@@ -72,12 +80,12 @@ fun callApi(username: String): Option<String> {
         val response = client.send(request, BodyHandlers.ofString())
 
         if (response.statusCode() == 404) {
-            None
+            AppError.UserNotFound(username).left()
         } else {
-            Some(response.body())
+            response.body().right()
         }
-    } catch (_: Exception) {
-        None
+    } catch (ex: Exception) {
+        AppError.GitHubConnectionFailed(ex.toString()).left()
     }
 }
 

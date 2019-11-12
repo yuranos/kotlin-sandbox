@@ -24,7 +24,7 @@ fun createKlaxon() = Klaxon()
             """ { "date" : $dateValue } """
     })
 
-fun saveRecord(userInfo: UserInfo): UserInfo {
+fun saveRecord(userInfo: UserInfo): Boolean {
     println(":: Saved user info ::")
-    return userInfo
+    return true
 }
