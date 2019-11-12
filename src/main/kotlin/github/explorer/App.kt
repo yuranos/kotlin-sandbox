@@ -68,12 +68,16 @@ fun callApi(username: String): Option<String> {
             .uri(URI.create("https://api.github.com/users/$username"))
             .build()
 
-    val response = client.send(request, BodyHandlers.ofString())
+    return try {
+        val response = client.send(request, BodyHandlers.ofString())
 
-    return if (response.statusCode() == 404) {
+        if (response.statusCode() == 404) {
+            None
+        } else {
+            Some(response.body())
+        }
+    } catch (_: Exception) {
         None
-    } else {
-        Some(response.body())
     }
 }
 
@@ -81,8 +85,9 @@ fun run(args: Array<String>) {
     val username = args.firstOrNull()
 
     try {
-        println(getUserInfo(username ?: "adomokos"))
+        println(getUserInfo(username ?: "adomokos1"))
     } catch (ex: Exception) {
+        // This should be a fatal exception - something unexpected
         println("Error occurred: $ex")
     }
 }
