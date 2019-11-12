@@ -54,11 +54,9 @@ fun addStarRating(userInfo: UserInfo): UserInfo {
 
 fun getUserInfo(username: String): Option<UserInfo> {
     val apiData = callApi(username)
-    return extractUserInfo(apiData).map {
-        addStarRating(it)
-    }.map {
-        saveUserInfo(it)
-    }
+    return extractUserInfo(apiData)
+        .map(::addStarRating)
+        .map(::saveUserInfo)
 }
 
 fun callApi(username: String): String {
