@@ -1,6 +1,8 @@
 package github.explorer
 
+import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import com.beust.klaxon.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -54,12 +56,15 @@ fun addStarRating(userInfo: UserInfo): UserInfo {
 
 fun getUserInfo(username: String): Option<UserInfo> {
     val apiData = callApi(username)
-    return extractUserInfo(apiData)
-        .map(::addStarRating)
-        .map(::saveUserInfo)
+    return when (apiData) {
+        is None -> None
+        is Some -> extractUserInfo(apiData.t)
+            .map(::addStarRating)
+            .map(::saveUserInfo)
+    }
 }
 
-fun callApi(username: String): String {
+fun callApi(username: String): Option<String> {
     val client = HttpClient.newBuilder().build()
     val request =
         HttpRequest
@@ -69,7 +74,11 @@ fun callApi(username: String): String {
 
     val response = client.send(request, BodyHandlers.ofString())
 
-    return response.body()
+    return if (response.statusCode() == 404) {
+        None
+    } else {
+        Some(response.body())
+    }
 }
 
 fun run(args: Array<String>) {
