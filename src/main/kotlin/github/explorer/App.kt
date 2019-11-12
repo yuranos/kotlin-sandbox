@@ -54,15 +54,11 @@ fun addStarRating(userInfo: UserInfo): UserInfo {
     return userInfo
 }
 
-fun getUserInfo(username: String): Option<UserInfo> {
-    val apiData = callApi(username)
-    return when (apiData) {
-        is None -> None
-        is Some -> extractUserInfo(apiData.t)
-            .map(::addStarRating)
-            .map(::saveUserInfo)
-    }
-}
+fun getUserInfo(username: String): Option<UserInfo> =
+    callApi(username)
+        .flatMap(::extractUserInfo)
+        .map(::addStarRating)
+        .map(::saveUserInfo)
 
 fun callApi(username: String): Option<String> {
     val client = HttpClient.newBuilder().build()
