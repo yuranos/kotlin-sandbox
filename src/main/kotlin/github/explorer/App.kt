@@ -1,15 +1,6 @@
 package github.explorer
 
-import arrow.core.Either
-import arrow.core.flatMap
-import arrow.core.left
-import arrow.core.leftIfNull
-import arrow.core.right
-import arrow.fx.IO
-import arrow.fx.handleError
 import com.beust.klaxon.Json
-import com.beust.klaxon.KlaxonException
-import java.net.ConnectException
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -47,38 +38,36 @@ data class UserInfo(
     }
 }
 
-private fun extractUserInfo(userInfoData: String): Either<AppError, UserInfo> =
-    try {
-        UserInfo
-            .deserializeFromJson(userInfoData)
-            .right()
-            .leftIfNull { AppError.UserDataJsonParseFailed("Parsed result is null") }
-    } catch (ex: KlaxonException) {
-        AppError.UserDataJsonParseFailed(ex.message ?: "No message").left()
+fun extractUserInfo(userInfoData: String): UserInfo? =
+    UserInfo.deserializeFromJson(userInfoData)
+
+fun saveUserInfo(userInfo: UserInfo?): UserInfo? {
+    if (userInfo == null) {
+        return userInfo
     }
 
-    /*
-    Try { createKlaxon().parse<UserInfo>(userInfoData) }
-        .toEither { AppError.UserDataJsonParseFailed("Couldn't parse") }
-        .leftIfNull { AppError.UserDataJsonParseFailed("Parsed result is null") }
-    */
+    return saveRecord(userInfo)
+}
 
-private fun addStarRating(userInfo: UserInfo): UserInfo {
+fun addStarRating(userInfo: UserInfo?): UserInfo? {
+    if (userInfo == null) {
+        return userInfo
+    }
+
     if (userInfo.publicReposCount > 20) {
         userInfo.username = userInfo.username + " ⭐"
     }
     return userInfo
-    // return Either.right(userInfo)
 }
 
-private fun getUserInfo(username: String): IO<Either<AppError, UserInfo>> =
-    callApi(username)
-        .map {
-            it.flatMap(::extractUserInfo)
-            .map(::addStarRating)
-    }
+fun getUserInfo(username: String): UserInfo? {
+    val apiData = callApi(username)
+    val userInfo = extractUserInfo(apiData)
+    val ratedUserInfo = addStarRating(userInfo)
+    return saveUserInfo(ratedUserInfo)
+}
 
-private fun callApi(username: String): IO<Either<AppError, String>> {
+fun callApi(username: String): String {
     val client = HttpClient.newBuilder().build()
     val request =
         HttpRequest
@@ -86,44 +75,17 @@ private fun callApi(username: String): IO<Either<AppError, String>> {
             .uri(URI.create("https://api.github.com/users/$username"))
             .build()
 
-    val result = try {
-        val response = client.send(request, BodyHandlers.ofString())
+    val response = client.send(request, BodyHandlers.ofString())
 
-        if (response.statusCode() == 404) {
-            AppError.UserNotFound("The user $username was not found on GitHub").left()
-        } else {
-            response.body().right()
-        }
-    } catch (_: ConnectException) {
-        AppError.GitHubConnectionFailed("Couldn't reach github.com").left()
-    }
-
-    return IO { result }
+    return response.body()
 }
-
-private fun handleAppError(error: Throwable): Unit = println("app failed \uD83D\uDCA5: $error")
-private fun handleFailure(error: AppError): Unit = println("The app error is: $error")
-private fun handleSuccess(userInfo: UserInfo): Unit = println("The result is: $userInfo")
 
 fun run(args: Array<String>) {
     val username = args.firstOrNull()
 
-    val program = getUserInfo(username ?: "adomokos")
-        .map {
-            result ->
-                when (result) {
-                    is Either.Left -> handleFailure(result.a)
-                    is Either.Right -> handleSuccess(result.b)
-                }
-        }
-        .handleError { error ->
-            handleAppError(error)
-        }
-
-    // Run the program asynchronously
-    program.unsafeRunAsync { result ->
-        result.fold({ error -> println("Error: $error") }, {})
+    try {
+        println(getUserInfo(username ?: "dryblaze"))
+    } catch (ex: Exception) {
+        println("Error occurred: $ex")
     }
-
-    // program.unsafeRunSync()
 }
