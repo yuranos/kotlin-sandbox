@@ -1,8 +1,6 @@
 package github.explorer
 
-import arrow.core.None
 import arrow.core.Option
-import arrow.core.Some
 import com.beust.klaxon.Json
 import java.net.URI
 import java.net.http.HttpClient
@@ -47,23 +45,20 @@ fun extractUserInfo(userInfoData: String): Option<UserInfo> =
 fun saveUserInfo(maybeUserInfo: UserInfo): UserInfo =
     saveRecord(maybeUserInfo)
 
-fun addStarRating(maybeUserInfo: Option<UserInfo>): Option<UserInfo> =
-    when (maybeUserInfo) {
-        is Some -> {
-            val userInfo = maybeUserInfo.t
-            if (userInfo.publicReposCount > 20) {
-                userInfo.username = userInfo.username + " ⭐"
-            }
-            Some(userInfo)
-        }
-        is None -> maybeUserInfo
+fun addStarRating(userInfo: UserInfo): UserInfo {
+    if (userInfo.publicReposCount > 20) {
+        userInfo.username = userInfo.username + " ⭐"
     }
+    return userInfo
+}
 
 fun getUserInfo(username: String): Option<UserInfo> {
     val apiData = callApi(username)
-    val userInfo = extractUserInfo(apiData)
-    val ratedUserInfo = addStarRating(userInfo)
-    return ratedUserInfo.map { saveUserInfo(it) }
+    return extractUserInfo(apiData).map {
+        addStarRating(it)
+    }.map {
+        saveUserInfo(it)
+    }
 }
 
 fun callApi(username: String): String {
